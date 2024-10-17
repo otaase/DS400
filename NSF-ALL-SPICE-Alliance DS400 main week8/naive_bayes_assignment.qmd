@@ -1,0 +1,245 @@
+---
+title: "Naive Bayes Classification Assignment"
+format: html
+editor: visual
+---
+
+## Assignment Description
+
+This assignment is designed to test your knowledge of Naive Bayes Classification. It closely mirrors our [naive_bayes_penguins.qmd](https://github.com/NSF-ALL-SPICE-Alliance/DS400/blob/main/week7/naive_bayes_penguins.qmd) from lectures 10/1 and 10/3. We reflect back on the true vs fake news dataset from the beginning of the semester and apply the new skills in our bayesian toolbox.
+
+This assignment is worth 16 points and is due by 10:00am on October 15th. Each section has a number of points noted. To turn in this assignment, render this qmd and save it as a pdf, it should look beautiful. If you do not want warning messages and other content in the rendered pdf, you can use `message = FALSE, warning = FALSE` at the top of each code chunk as it appears in the libraries code chunk below.
+
+### Load Libraries
+
+```{r, message=FALSE, warning=FALSE}
+library(bayesrules)
+library(tidyverse)
+library(e1071)
+library(janitor)
+library(ggplot2)
+```
+
+### Read in data
+
+```{r}
+data(fake_news)
+```
+
+```{r}
+fake_news
+```
+
+### Challenge
+
+[**Exercise 14.7**](https://www.bayesrulesbook.com/chapter-14#exercises-13) **Fake news: three predictors**
+
+Suppose a ***new news article*** is posted online – it has a 15-word title, 6% of its words have negative associations, and its title *doesn’t* have an exclamation point. We want to know if it is fake or real
+
+### Visualization (Exploratory Data Analysis) - 2 points
+
+Below, insert a code chunk(s) and use `ggplot` to visualize the features of the data we are interested in. This can be one or multiple visualizations
+
+-   Type (fake vs real)
+
+```{r}
+ggplot(data = fake_news, aes(x = type, fill = type)) +
+  geom_bar()
+```
+
+```{r}
+ggplot(fake_news, aes(x = type)) +
+  geom_bar(fill = c("pink", "orange"), alpha = 0.7) +
+  geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5) +
+  labs(title = "Count of Real vs Fake", x = NULL, y = "Count") +
+  theme_minimal()
+```
+
+-   Pie Chart : to give me another visualization of real vs. fake to better understand it
+
+```{r}
+ggplot(fake_news, aes(x = "", fill = type)) +
+  geom_bar(width = 1) +
+  coord_polar(theta = "y") +
+  labs(title = "Real vs Fake") +
+  theme_void() 
+```
+
+-   Number of words in the title (numeric value)
+
+```{r}
+ggplot(fake_news, aes(x = title_words)) +
+  geom_histogram(binwidth = 1, fill = "purple", color = "red", alpha = 0.7) +
+  labs(title = "Distribution of Words in Titles", x = "Words per Title", y = "Frequency") +
+  theme_minimal()
+```
+
+-   Negative associations (numeric value)
+
+```{r}
+ggplot(fake_news, aes(x = negative, fill = type)) +
+  geom_histogram(bins = 30, position = "dodge", alpha = 0.7) +
+  labs(title = "Distribution of Negative Associations by News Type",
+       x = "Negative Association Score",
+       y = "Count") +
+  scale_fill_manual(values = c("real" = "green", "fake" = "pink")) +
+  theme_minimal()
+```
+
+-   Exclamation point in the title (true vs false)
+
+```{r}
+title_count <- nrow(fake_news)
+cat("The number of titles in the fake_news dataset is:", title_count, "\n")
+```
+
+I just used this code to double check how many titles there are in the fake_news data set to see if the results to my visualization is correct and accurate.
+
+-   Creating a new column indicating that there is ! points & without ! points
+
+```{r}
+fake_news <- fake_news %>%
+  mutate(title_has_excl = str_detect(title, "!"))
+
+exclamation_counts <- fake_news %>%
+  count(title_has_excl, name = "count") 
+```
+
+### Bar Plot of Title with Exclamation Points
+
+```{r}
+ggplot(exclamation_counts, aes(x = factor(title_has_excl, labels = c("No", "Yes")), y = count)) +
+  geom_bar(stat = "identity", fill = "yellow", alpha = 0.7, width = 0.6) +
+  geom_text(aes(label = count), position = position_stack(vjust = 0.5), size = 5) +
+  labs(title = "Count of Titles with Exclamation Points", x = "Has ! Point", y = "Count") +
+  theme_minimal(base_size = 15)
+```
+
+Stacked Bar
+
+### Interpretation of Visualization - 2 points
+
+Below, write a few sentences explaining whether or not this ***new news article*** is true or fake solely using your visualization above
+
+-   After looking at my visualizations that I did for the data set it is pretty clear that the news article is real. As the real always outweighs the fake in the variables that I used for my visualizations above.
+
+### Perform Naive Bayes Classification - 3 points
+
+Based on these three features (15-word title, 6% of its words have negative associations, and its title *doesn’t* have an exclamation point), utilize naive Bayes classification to calculate the posterior probability that the article is real. Do so using `naiveBayes()` with `predict()`.
+
+Below, insert the code chunks and highlight your answer
+
+### Break Down the Model - 5 points
+
+Similar to the penguins example, we are going to break down the model we created above. To do this we need to find:
+
+### Naives Bayes Classification
+
+```{r}
+naive_model_fake <- naiveBayes(type ~ title_words + title_has_excl + negative, data = fake_news)
+```
+
+Our_fake is the name of my new data_set
+
+```{r}
+our_fake <- data.frame(title_words = 15, negative = 0.06, title_has_excl = FALSE)
+view(our_fake)
+```
+
+Ask model to predict
+
+```{r}
+predict(naive_model_fake, newdata = our_fake, type = "raw")
+```
+
+### Test my Model
+
+```{r}
+fake_news <- fake_news %>% 
+  mutate(predicted_news = predict(naive_model_fake, newdata = .))
+```
+
+```{r}
+fake_news%>% 
+  tabyl(type, predicted_news) %>% 
+  adorn_percentages("row") %>% 
+  adorn_pct_formatting(digits = 2) %>%
+  adorn_ns
+```
+
+```{r}
+naive_model_fake
+```
+
+-   Probability(15 - word title\| article is fake) using `dnorm()`
+
+```{r}
+dnorm(15, mean = 10.42222, sd = 3.204554)
+```
+
+-   Probability(6% of words have negative associations \| article is real) using `dnorm()`
+
+Fake - Negative
+
+```{r}
+dnorm(0.06, mean = 3.606333, sd = 1.466429)
+```
+
+Real - Negative
+
+```{r}
+dnorm(0.06, mean = 2.806556, sd = 1.190917)
+```
+
+-   Probability(no exclamation point in title \| article is real)
+
+    -   Multiply these probabilities and save as the object **`probs_real`**
+
+```{r}
+dnorm(0, mean = 0.73333333, sd =  0.26666667)
+```
+
+```{r}
+P_no_exclamation_point_given_real <-  0.73333333
+P_no_exclamation_point_given_fake <- 0.97777778
+```
+
+```{r}
+P_no_exclamation_given_real <- 0.97777778
+P_real <- 0.6  
+probs_real <- P_no_exclamation_given_real * P_real
+```
+
+```{r}
+print(probs_real)
+```
+
+Lastly divide your **`probs_real`** by the sum of **`probs_real`** and **`probs_fake`** to see if you can reproduce the output from `naiveBayes()` above
+
+```{r}
+
+```
+
+### Confusion Matrix - 2 points
+
+Calculate a confusion matrix by first mutating a column to fake_news called `predicted_type` . Then, use `tabyl()` to create the matrix
+
+```{r}
+fake_news <- fake_news %>%
+  mutate(predicted_type = sample(c("fake_news", "real_news"), nrow(fake_news), replace = TRUE))
+```
+
+```{r}
+confusion_matrix <- fake_news %>%
+  tabyl(predicted_news, predicted_type)
+```
+
+```{r}
+print(confusion_matrix)
+```
+
+### How can our model be improved? - 2 points
+
+Think about the results of the confusion matrix, is the model performing well? Try creating a new model that uses all of the features in the fake_news dataset to make a prediction on type (fake vs true). Then, create a new confusion matrix to see if the model improves.
+
+-   I think that based off of the results above from the confusion matrix the model is not performing so well as the accuracy is quite low.
